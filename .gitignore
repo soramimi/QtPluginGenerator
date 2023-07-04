@@ -1,0 +1,7 @@
+*.o
+*.user
+moc_*
+ui_*
+_build/
+.qmake.stash
+Makefile
