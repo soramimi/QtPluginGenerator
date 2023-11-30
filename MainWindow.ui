@@ -62,6 +62,13 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
+       <widget class="QPushButton" name="pushButton_custom">
+        <property name="text">
+         <string>Custom</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -93,6 +100,13 @@
    </layout>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>lineEdit_destination_dir</tabstop>
+  <tabstop>pushButton_browse_destination</tabstop>
+  <tabstop>lineEdit_project_name</tabstop>
+  <tabstop>pushButton_generate</tabstop>
+  <tabstop>pushButton_close</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

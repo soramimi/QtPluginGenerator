@@ -21,6 +21,7 @@ private slots:
 	void on_pushButton_browse_destination_clicked();
 	void on_pushButton_generate_clicked();
 	void on_pushButton_close_clicked();
+	void on_pushButton_custom_clicked();
 };
 
 #endif // MAINWINDOW_H

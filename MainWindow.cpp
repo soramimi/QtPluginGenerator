@@ -3,6 +3,7 @@
 #include "Global.h"
 #include "ProjectGenerator.h"
 #include "joinpath.h"
+#include "CustomGeneratorDialog.h"
 #include <QDebug>
 #include <QDirIterator>
 #include <QFileDialog>
@@ -56,6 +57,18 @@ void MainWindow::generate2()
 		QMessageBox::information(this, "", tr("Generated Successfully"));
 	} else {
 		QMessageBox::critical(this, "", tr("Generation Failed"));
+	}
+}
+
+
+
+
+
+void MainWindow::on_pushButton_custom_clicked()
+{
+	CustomGeneratorDialog dlg(this);
+	if (dlg.exec() == QDialog::Accepted) {
+		close();
 	}
 }
 
