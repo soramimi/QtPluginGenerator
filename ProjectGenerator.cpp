@@ -150,7 +150,9 @@ std::vector<char> replaceWords(std::string_view const &srctext, std::vector<std:
 							cp = LowerCase;
 						}
 					}
-					AppendS(convert(dstwords[i], cp));
+					if (i < dstwords.size()) {
+						AppendS(convert(dstwords[i], cp));
+					}
 					next = vec[i] + n;
 					if (i + 1 < vec.size()) {
 						int r = p + n;
@@ -165,7 +167,7 @@ std::vector<char> replaceWords(std::string_view const &srctext, std::vector<std:
 								sep = 0; // invalidate
 								break;
 							}
-							if (sep != 0) {
+							if (sep != 0 && i + 1 < dstwords.size()) {
 								AppendC(sep);
 							}
 						}
@@ -185,6 +187,7 @@ std::vector<char> replaceWords(std::string_view const &srctext, std::vector<std:
 			break;
 		}
 	}
+
 	return newtext;
 }
 
