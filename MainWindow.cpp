@@ -51,7 +51,7 @@ void MainWindow::generate2()
 	if (project_name.isEmpty()) return;
 	dstdir = dstdir / project_name + "Plugin";
 
-	bool ok = ProjectGenerator().perform(template_dir, dstdir, "HelloWorld", project_name.toStdString());
+	bool ok = ProjectGenerator("HelloWorld", project_name.toStdString()).perform(template_dir, dstdir);
 
 	if (ok) {
 		QMessageBox::information(this, "", tr("Generated Successfully"));

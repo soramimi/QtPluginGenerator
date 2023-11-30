@@ -5,3 +5,6 @@ ui_*
 _build/
 .qmake.stash
 Makefile
+*.exe
+*.ilk
+*.pdb

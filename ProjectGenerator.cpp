@@ -82,7 +82,14 @@ std::string convert(std::string_view const &s, CaseStyle cp)
 	return ret;
 }
 
-std::vector<char> replaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+#ifdef _WIN32
+int strncasecmp(char const *l, const char *r, int n)
+{
+	return strnicmp(l, r, n);
+}
+#endif
+
+std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	std::vector<char> newtext;
 
@@ -191,7 +198,7 @@ std::vector<char> replaceWords(std::string_view const &srctext, std::vector<std:
 	return newtext;
 }
 
-void convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+void ProjectGenerator::convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	QFile infile(srcpath);
 	if (infile.open(QFile::ReadOnly)) {
@@ -202,10 +209,16 @@ void convertFile(QString const &srcpath, QString const &dstpath, std::vector<std
 		QByteArray ba = infile.readAll();
 		QFile outfile(dstpath);
 		if (outfile.open(QFile::WriteOnly)) {
-			auto vec = replaceWords({ba.begin(), ba.size()}, srcwords, dstwords);
+			auto vec = internalReplaceWords(std::string_view(ba.begin(), ba.size()), srcwords, dstwords);
 			outfile.write(vec.data(), vec.size());
 		}
 	}
+}
+
+ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
+{
+	srcwords_ = split(srcname);
+	dstwords_ = split(dstname);
 }
 
 struct FileItem {
@@ -239,19 +252,18 @@ void scandir(QString const &basedir, QString const &absdir, std::vector<FileItem
 	}
 }
 
-bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath, std::string_view const &srcname, std::string_view const &dstname)
+QString ProjectGenerator::replaceWords(QString const &s)
+{
+	std::string t = s.toStdString();
+	auto vec = internalReplaceWords(t, srcwords_, dstwords_);
+	return QString::fromUtf8(vec.data(), vec.size());
+}
+
+bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath)
 {
 	std::vector<FileItem> files;
 	scandir(srcpath, {}, &files);
 
-	std::vector<std::string> srcwords = split(srcname);
-	std::vector<std::string> dstwords = split(dstname);
-
-	auto strReplaceWords = [&](QString const &s){
-		std::string t = s.toStdString();
-		auto vec = replaceWords(t, srcwords, dstwords);
-		return QString::fromUtf8(vec.data(), vec.size());
-	};
 
 	if (QFileInfo::exists(dstpath)) {
 		QMessageBox::warning(nullptr, "", "Already existing:\n" + dstpath);
@@ -260,8 +272,8 @@ bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath, s
 
 	for (FileItem const &item : files) {
 		QString s = srcpath / item.srcpath;
-		QString d = dstpath / strReplaceWords(item.dstpath);
-		convertFile(s, d, srcwords, dstwords);
+		QString d = dstpath / replaceWords(item.dstpath);
+		convertFile(s, d, srcwords_, dstwords_);
 	}
 
 	return true;
