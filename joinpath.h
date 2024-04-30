@@ -12,6 +12,7 @@ static inline std::string operator / (std::string const &left, std::string const
 	return joinpath(left, right);
 }
 
+#ifdef USE_QT
 #include <QString>
 QString qjoinpath(ushort const *left, ushort const *right);
 inline QString joinpath(QString const &left, QString const &right)
@@ -24,4 +25,5 @@ static inline QString operator / (QString const &left, QString const &right)
 	return joinpath(left, right);
 }
 
-#endif
+#endif // USE_QT
+#endif // 

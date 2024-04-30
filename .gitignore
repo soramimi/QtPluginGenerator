@@ -9,3 +9,5 @@ Makefile
 *.ilk
 *.pdb
 build/
+gui/QtPluginGenerator
+cpren

@@ -1,8 +1,10 @@
 #include "ProjectGenerator.h"
-#include "ui_MainWindow.h"
-#include "joinpath.h"
-#include <QDirIterator>
-#include <QMessageBox>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <algorithm>
+#include <cstring>
 
 static inline bool is_upper(char c)
 {
@@ -38,22 +40,22 @@ struct JoinPolicy {
  */
 std::vector<std::string> split(std::string_view const &s)
 {
-    std::vector<std::string> words;
+	std::vector<std::string> words;
 	char const *p = s.data();
-    while (*p != 0) {
-        int i = 1;
-        while (1) {
-            char c = p[i];
-            if (c == 0 || (is_upper(c) && is_lower(p[i + 1]))) {
-                break;
-            }
-            i++;
-        }
-        std::string word(p, i);
-        words.push_back(word);
-        p += i;
-    }
-    return words;
+	while (*p != 0) {
+		int i = 1;
+		while (1) {
+			char c = p[i];
+			if (c == 0 || (is_upper(c) && is_lower(p[i + 1]))) {
+				break;
+			}
+			i++;
+		}
+		std::string word(p, i);
+		words.push_back(word);
+		p += i;
+	}
+	return words;
 }
 
 /**
@@ -198,6 +200,109 @@ std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const 
 	return newtext;
 }
 
+void ProjectGenerator::convertFile(std::string const &srcpath, std::string const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+{
+	int fd = open(srcpath.c_str(), O_RDONLY);
+	if (fd != -1) {
+		auto const *i = strrchr(srcpath.c_str(), '/');
+		if (i > srcpath.c_str()) {
+			std::string basedir(srcpath.c_str(), i - srcpath.c_str());
+			mkdir(basedir.c_str(), 0755);
+		}
+		struct stat st;
+		if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode)) {
+			std::vector<char> vec(st.st_size);
+			read(fd, vec.data(), vec.size());
+			close(fd);
+			fd = open(dstpath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+			if (fd != -1) {
+				auto vec2 = internalReplaceWords(std::string_view(vec.data(), vec.size()), srcwords, dstwords);
+				write(fd, vec2.data(), vec2.size());
+				close(fd);
+			}
+		}
+	}
+}
+
+struct FileItem {
+	std::string srcpath;
+	std::string dstpath;
+	FileItem() = default;
+	FileItem(std::string const &srcpath, std::string const &dstpath)
+		: srcpath(srcpath)
+		, dstpath(dstpath)
+	{
+	}
+};
+
+void scandir(std::string const &basedir, std::string const &absdir, std::vector<FileItem> *out)
+{
+	DIR *dir = opendir((basedir + "/" + absdir).c_str());
+	if (dir) {
+		while (dirent *ent = readdir(dir)) {
+			std::string filename = ent->d_name;
+			if (filename[0] == '.') continue;
+			std::string path = absdir + "/" + filename;
+			if (ent->d_type == DT_DIR) {
+				scandir(basedir, path, out);
+			} else if (ent->d_type == DT_REG) {
+				auto StartsWith = [](std::string_view const &s, std::string_view const &prefix) {
+					return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
+				};
+				auto EndsWith = [](std::string_view const &s, std::string_view const &suffix) {
+					return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
+				};
+				if (EndsWith(filename, ".user")) continue;
+				std::string dpath = absdir + "/" + (StartsWith(filename, "_.") ? filename.substr(1) : filename);
+				out->push_back({path, dpath});
+			}
+		}
+		closedir(dir);
+	}
+}
+
+std::string ProjectGenerator::replaceWords(std::string const &t)
+{
+	auto vec = internalReplaceWords(t, srcwords_, dstwords_);
+	return std::string(vec.data(), vec.size());
+}
+
+bool ProjectGenerator::perform(std::string const &srcpath, std::string const &dstpath)
+{
+	std::vector<FileItem> files;
+	scandir(srcpath, {}, &files);
+	
+	struct stat stdst;
+	if (stat(dstpath.c_str(), &stdst) == 0) {
+		fprintf(stderr, "Already existing: %s\n", dstpath.c_str());
+		return false;
+	}
+	
+	struct stat stsrc;
+	if (stat(srcpath.c_str(), &stsrc) == 0) {
+		if (S_ISREG(stsrc.st_mode)) {
+			convertFile(srcpath, dstpath, srcwords_, dstwords_);
+		} else if (S_ISDIR(stsrc.st_mode)) {
+			for (FileItem const &item : files) {
+				std::string s = srcpath + "/" + item.srcpath;
+				std::string d = dstpath + "/" + replaceWords(item.dstpath);
+				convertFile(s, d, srcwords_, dstwords_);
+			}
+		}
+	} else {
+		fprintf(stderr, "Not found: %s\n", srcpath.c_str());
+		return false;
+	}
+	
+	return true;
+}
+
+
+#ifdef USE_QT
+
+#include <QDirIterator>
+#include <QMessageBox>
+
 void ProjectGenerator::convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	QFile infile(srcpath);
@@ -215,24 +320,18 @@ void ProjectGenerator::convertFile(QString const &srcpath, QString const &dstpat
 	}
 }
 
-ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
-{
-	srcwords_ = split(srcname);
-	dstwords_ = split(dstname);
-}
-
-struct FileItem {
+struct qFileItem {
 	QString srcpath;
 	QString dstpath;
-	FileItem() = default;
-	FileItem(QString const &srcpath, QString const &dstpath)
+	qFileItem() = default;
+	qFileItem(QString const &srcpath, QString const &dstpath)
 		: srcpath(srcpath)
 		, dstpath(dstpath)
 	{
 	}
 };
 
-void scandir(QString const &basedir, QString const &absdir, std::vector<FileItem> *out)
+void scandir(QString const &basedir, QString const &absdir, std::vector<qFileItem> *out)
 {
 	QDirIterator it(basedir / absdir);
 	while (it.hasNext()) {
@@ -252,6 +351,12 @@ void scandir(QString const &basedir, QString const &absdir, std::vector<FileItem
 	}
 }
 
+ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
+{
+	srcwords_ = split(srcname);
+	dstwords_ = split(dstname);
+}
+
 QString ProjectGenerator::replaceWords(QString const &s)
 {
 	std::string t = s.toStdString();
@@ -261,21 +366,28 @@ QString ProjectGenerator::replaceWords(QString const &s)
 
 bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath)
 {
-	std::vector<FileItem> files;
+	std::vector<qFileItem> files;
 	scandir(srcpath, {}, &files);
-
-
-	if (QFileInfo::exists(dstpath)) {
+	
+	QFileInfo srcinfo(srcpath);
+	QFileInfo dstinfo(dstpath);
+	
+	if (dstinfo.exists()) {
 		QMessageBox::warning(nullptr, "", "Already existing:\n" + dstpath);
 		return false;
 	}
-
-	for (FileItem const &item : files) {
-		QString s = srcpath / item.srcpath;
-		QString d = dstpath / replaceWords(item.dstpath);
-		convertFile(s, d, srcwords_, dstwords_);
+	
+	if (srcinfo.isFile()) {
+		convertFile(srcpath, dstpath, srcwords_, dstwords_);
+	} else if (srcinfo.isDir()) {
+		for (qFileItem const &item : files) {
+			QString s = srcpath / item.srcpath;
+			QString d = dstpath / replaceWords(item.dstpath);
+			convertFile(s, d, srcwords_, dstwords_);
+		}
 	}
 
 	return true;
 }
 
+#endif // USE_QT

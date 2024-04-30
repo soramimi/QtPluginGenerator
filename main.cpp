@@ -1,15 +1,20 @@
 
-#include "MainWindow.h"
-#include "Global.h"
 
+#include "joinpath.h"
+#include "ProjectGenerator.h"
+
+#ifdef USE_QT
+#include "Global.h"
+#include "MainWindow.h"
 #include <QApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
-#include <QDir>
-#include "joinpath.h"
+#endif
 
 int main(int argc, char **argv)
 {
+#ifdef USE_QT
 	Global g;
 	global = &g;
 	global->executable_dir = QFileInfo(argv[0]).absoluteDir().absolutePath();
@@ -20,5 +25,9 @@ int main(int argc, char **argv)
 	MainWindow w;
 	w.show();
 	return a.exec();
+#else
+	
+	return 0;
+#endif
 }
 

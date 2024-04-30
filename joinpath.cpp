@@ -1,5 +1,4 @@
 #include "joinpath.h"
-#include <sstream>
 #include <vector>
 #include <cstring>
 
@@ -57,6 +56,7 @@ std::string joinpath(std::string const &left, std::string const &right)
 	return joinpath(left.c_str(), right.c_str());
 }
 
+#ifdef USE_QT
 QString qjoinpath(ushort const *left, ushort const *right)
 {
     std::vector<ushort> vec;
@@ -64,4 +64,4 @@ QString qjoinpath(ushort const *left, ushort const *right)
     if (vec.empty()) return QString();
     return QString::fromUtf16(&vec[0], vec.size());
 }
-
+#endif
