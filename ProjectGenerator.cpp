@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <algorithm>
 #include <cstring>
+#include "joinpath.h"
 
 static inline bool is_upper(char c)
 {
@@ -90,6 +91,12 @@ int strncasecmp(char const *l, const char *r, int n)
 	return strnicmp(l, r, n);
 }
 #endif
+
+ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
+{
+	srcwords_ = split(srcname);
+	dstwords_ = split(dstname);
+}
 
 std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
@@ -200,20 +207,38 @@ std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const 
 	return newtext;
 }
 
+bool mkpath(std::string const &path, std::string const &dir, int mode)
+{
+	struct stat st;
+	if (stat(dir.c_str(), &st) == 0) {
+		if (S_ISDIR(st.st_mode)) return true;
+		return false;
+	}
+	auto it = dir.find_last_of('/');
+	if (it != std::string::npos) {
+		if (!mkpath(path, dir.substr(0, (int)it), mode)) {
+			return false;
+		}
+	}
+	printf("mkdir: %s\n", path.c_str());
+	return mkdir(dir.c_str(), mode) == 0;
+}
+
 void ProjectGenerator::convertFile(std::string const &srcpath, std::string const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	int fd = open(srcpath.c_str(), O_RDONLY);
 	if (fd != -1) {
-		auto const *i = strrchr(srcpath.c_str(), '/');
-		if (i > srcpath.c_str()) {
-			std::string basedir(srcpath.c_str(), i - srcpath.c_str());
-			mkdir(basedir.c_str(), 0755);
+		auto const *i = strrchr(dstpath.c_str(), '/');
+		if (i > dstpath.c_str()) {
+			std::string basedir(dstpath.c_str(), i - dstpath.c_str());
+			mkpath(basedir, basedir, 0755);
 		}
 		struct stat st;
 		if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode)) {
 			std::vector<char> vec(st.st_size);
 			read(fd, vec.data(), vec.size());
 			close(fd);
+			printf(" file: %s\n", dstpath.c_str());
 			fd = open(dstpath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
 			if (fd != -1) {
 				auto vec2 = internalReplaceWords(std::string_view(vec.data(), vec.size()), srcwords, dstwords);
@@ -237,12 +262,14 @@ struct FileItem {
 
 void scandir(std::string const &basedir, std::string const &absdir, std::vector<FileItem> *out)
 {
-	DIR *dir = opendir((basedir + "/" + absdir).c_str());
+	DIR *dir = opendir((basedir / absdir).c_str());
 	if (dir) {
 		while (dirent *ent = readdir(dir)) {
+			if (strcmp(ent->d_name, ".") == 0) continue;
+			if (strcmp(ent->d_name, "..") == 0) continue;
+			if (strcmp(ent->d_name, ".git") == 0) continue;
 			std::string filename = ent->d_name;
-			if (filename[0] == '.') continue;
-			std::string path = absdir + "/" + filename;
+			std::string path = absdir / filename;
 			if (ent->d_type == DT_DIR) {
 				scandir(basedir, path, out);
 			} else if (ent->d_type == DT_REG) {
@@ -252,8 +279,9 @@ void scandir(std::string const &basedir, std::string const &absdir, std::vector<
 				auto EndsWith = [](std::string_view const &s, std::string_view const &suffix) {
 					return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
 				};
-				if (EndsWith(filename, ".user")) continue;
-				std::string dpath = absdir + "/" + (StartsWith(filename, "_.") ? filename.substr(1) : filename);
+				//if (EndsWith(filename, ".user")) continue;
+				//std::string dpath = absdir / (StartsWith(filename, "_.") ? filename.substr(1) : filename);
+				auto dpath = absdir / filename;
 				out->push_back({path, dpath});
 			}
 		}
@@ -269,12 +297,13 @@ std::string ProjectGenerator::replaceWords(std::string const &t)
 
 bool ProjectGenerator::perform(std::string const &srcpath, std::string const &dstpath)
 {
+	//fprintf(stderr, "%s %s\n", srcpath.c_str(), dstpath.c_str());
 	std::vector<FileItem> files;
 	scandir(srcpath, {}, &files);
 	
 	struct stat stdst;
 	if (stat(dstpath.c_str(), &stdst) == 0) {
-		fprintf(stderr, "Already existing: %s\n", dstpath.c_str());
+		fprintf(stderr, "already existing: %s\n", dstpath.c_str());
 		return false;
 	}
 	
@@ -284,8 +313,8 @@ bool ProjectGenerator::perform(std::string const &srcpath, std::string const &ds
 			convertFile(srcpath, dstpath, srcwords_, dstwords_);
 		} else if (S_ISDIR(stsrc.st_mode)) {
 			for (FileItem const &item : files) {
-				std::string s = srcpath + "/" + item.srcpath;
-				std::string d = dstpath + "/" + replaceWords(item.dstpath);
+				std::string s = srcpath / item.srcpath;
+				std::string d = dstpath / replaceWords(item.dstpath);
 				convertFile(s, d, srcwords_, dstwords_);
 			}
 		}
@@ -342,19 +371,15 @@ void scandir(QString const &basedir, QString const &absdir, std::vector<qFileIte
 		if (info.isDir()) {
 			scandir(basedir, absdir / filename, out);
 		} else if (info.isFile()) {
+			if (filename == ".git") continue;
 			if (filename.endsWith(".user")) continue;
 			QString path = absdir / filename;
 			// "_."で始まるファイルは、先頭の"_"を削除
-			QString dpath = absdir / (filename.startsWith("_.") ? filename.mid(1) : filename);
+			auto dpath = absdir / (filename.startsWith("_.") ? filename.mid(1) : filename);
+			//QString dpath = absdir / filename;
 			out->push_back({path, dpath});
 		}
 	}
-}
-
-ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
-{
-	srcwords_ = split(srcname);
-	dstwords_ = split(dstname);
 }
 
 QString ProjectGenerator::replaceWords(QString const &s)

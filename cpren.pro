@@ -2,7 +2,7 @@
 TARGET = cpren
 TEMPLATE = app
 CONFIG -= qt
-DESTDIR = $$PWD
+#DESTDIR = $$PWD
 
 SOURCES += \
 	ProjectGenerator.cpp \

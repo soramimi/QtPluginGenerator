@@ -1,0 +1,15 @@
+all:
+	g++ -std=c++17 -O3 main.cpp ProjectGenerator.cpp joinpath.cpp -o cpren
+
+clean:
+	-rm *.o
+	-rm a.out
+	-rm cpren
+
+run:
+	./cpren HelloWorld:HogeFuga gui/HelloWorldPlugin a
+
+
+run2:
+	./cpren QtPlugin:HogeFuga QtPluginGenerator b/
+
