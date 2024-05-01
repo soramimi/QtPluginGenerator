@@ -1,6 +1,6 @@
 
-#ifndef __JOINPATH_H
-#define __JOINPATH_H
+#ifndef JOINPATH_H
+#define JOINPATH_H
 
 #include <string>
 
@@ -26,4 +26,5 @@ static inline QString operator / (QString const &left, QString const &right)
 }
 
 #endif // USE_QT
-#endif // 
+
+#endif // JOINPATH_H

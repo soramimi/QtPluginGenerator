@@ -2,10 +2,6 @@
 #include <vector>
 #include <cstring>
 
-#ifdef WIN32
-#pragma warning(disable:4996)
-#endif
-
 template <typename T> static inline void trimquot(T const **begin, T const **end)
 {
 	if (*begin + 1 < *end && (*begin)[0] == '"' && (*end)[-1] == '"') {

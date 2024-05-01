@@ -1,20 +1,30 @@
 #include "ProjectGenerator.h"
+#include "joinpath.h"
+#include <algorithm>
+#include <cstring>
+#include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <algorithm>
-#include <cstring>
-#include "joinpath.h"
 
+/**
+ * @brief 大文字かどうかを判定する
+ * @param c
+ * @return 
+ */
 static inline bool is_upper(char c)
 {
 	return std::isupper((unsigned char)c);
 }
 
+/**
+ * @brief 小文字かどうかを判定する
+ * @param c
+ * @return 
+ */
 static inline bool is_lower(char c)
 {
-	return std::islower((unsigned char)c);
+	return std::islower((unsigned char)c) || std::isdigit((unsigned char)c); // 数字も小文字扱い
 }
 
 enum CaseStyle {
@@ -98,6 +108,15 @@ ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_
 	dstwords_ = split(dstname);
 }
 
+/**
+ * @brief 文字列中の単語を置換する
+ * @param srctext
+ * @param srcwords
+ * @param dstwords
+ * @return
+ * 
+ * 例: srctext = "HelloWorld", srcwords = ["Hello", "World"], dstwords = ["Good", "Bye"]
+ */
 std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	std::vector<char> newtext;
@@ -207,6 +226,13 @@ std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const 
 	return newtext;
 }
 
+/**
+ * @brief mkpath ディレクトリを作成する
+ * @param path 
+ * @param dir
+ * @param mode
+ * @return 
+ */
 bool mkpath(std::string const &path, std::string const &dir, int mode)
 {
 	struct stat st;
@@ -224,6 +250,13 @@ bool mkpath(std::string const &path, std::string const &dir, int mode)
 	return mkdir(dir.c_str(), mode) == 0;
 }
 
+/**
+ * @brief ファイルを変換してコピーする
+ * @param srcpath
+ * @param dstpath
+ * @param srcwords
+ * @param dstwords
+ */
 void ProjectGenerator::convertFile(std::string const &srcpath, std::string const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	int fd = open(srcpath.c_str(), O_RDONLY);
@@ -260,6 +293,12 @@ struct FileItem {
 	}
 };
 
+/**
+ * @brief ディレクトリを再帰的にスキャンする
+ * @param basedir
+ * @param absdir
+ * @param out
+ */
 void scandir(std::string const &basedir, std::string const &absdir, std::vector<FileItem> *out)
 {
 	DIR *dir = opendir((basedir / absdir).c_str());
@@ -273,14 +312,6 @@ void scandir(std::string const &basedir, std::string const &absdir, std::vector<
 			if (ent->d_type == DT_DIR) {
 				scandir(basedir, path, out);
 			} else if (ent->d_type == DT_REG) {
-				auto StartsWith = [](std::string_view const &s, std::string_view const &prefix) {
-					return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
-				};
-				auto EndsWith = [](std::string_view const &s, std::string_view const &suffix) {
-					return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
-				};
-				//if (EndsWith(filename, ".user")) continue;
-				//std::string dpath = absdir / (StartsWith(filename, "_.") ? filename.substr(1) : filename);
 				auto dpath = absdir / filename;
 				out->push_back({path, dpath});
 			}
@@ -289,15 +320,25 @@ void scandir(std::string const &basedir, std::string const &absdir, std::vector<
 	}
 }
 
+/**
+ * @brief 単語を置換する
+ * @param s
+ * @return 
+ */
 std::string ProjectGenerator::replaceWords(std::string const &t)
 {
 	auto vec = internalReplaceWords(t, srcwords_, dstwords_);
 	return std::string(vec.data(), vec.size());
 }
 
+/**
+ * @brief プロジェクトを生成する
+ * @param srcpath
+ * @param dstpath
+ * @return 
+ */
 bool ProjectGenerator::perform(std::string const &srcpath, std::string const &dstpath)
 {
-	//fprintf(stderr, "%s %s\n", srcpath.c_str(), dstpath.c_str());
 	std::vector<FileItem> files;
 	scandir(srcpath, {}, &files);
 	
@@ -332,6 +373,13 @@ bool ProjectGenerator::perform(std::string const &srcpath, std::string const &ds
 #include <QDirIterator>
 #include <QMessageBox>
 
+/**
+ * @brief ファイルを変換してコピーする
+ * @param srcpath
+ * @param dstpath
+ * @param srcwords
+ * @param dstwords
+ */
 void ProjectGenerator::convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	QFile infile(srcpath);
@@ -360,6 +408,12 @@ struct qFileItem {
 	}
 };
 
+/**
+ * @brief ディレクトリを再帰的にスキャンする
+ * @param basedir
+ * @param absdir
+ * @param out
+ */
 void scandir(QString const &basedir, QString const &absdir, std::vector<qFileItem> *out)
 {
 	QDirIterator it(basedir / absdir);
@@ -382,6 +436,11 @@ void scandir(QString const &basedir, QString const &absdir, std::vector<qFileIte
 	}
 }
 
+/**
+ * @brief 単語を置換する
+ * @param s
+ * @return 
+ */
 QString ProjectGenerator::replaceWords(QString const &s)
 {
 	std::string t = s.toStdString();
@@ -389,6 +448,12 @@ QString ProjectGenerator::replaceWords(QString const &s)
 	return QString::fromUtf8(vec.data(), vec.size());
 }
 
+/**
+ * @brief プロジェクトを生成する
+ * @param srcpath
+ * @param dstpath
+ * @return 
+ */
 bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath)
 {
 	std::vector<qFileItem> files;

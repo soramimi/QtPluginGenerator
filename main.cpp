@@ -1,18 +1,17 @@
 
-
-#include "joinpath.h"
 #include "ProjectGenerator.h"
-#include <cstring>
 #include <cctype>
+#include <cstring>
 #include <sys/stat.h>
 
 #ifdef USE_QT
-#include "Global.h"
-#include "MainWindow.h"
+#include "gui/Global.h"
+#include "gui/MainWindow.h"
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
+#include "joinpath.h"
 #endif
 
 std::string to_string(std::string_view const &v)
@@ -34,12 +33,19 @@ int main(int argc, char **argv)
 	w.show();
 	return a.exec();
 #else
+	bool usage = false;
+	
 	char const *rule = nullptr;
 	char const *srcpath = nullptr;
 	char const *dstpath = nullptr;
 	for (int argi = 1; argi < argc; argi++) {
 		char const *arg = argv[argi];
 		if (*arg == '-') {
+			if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+				usage = true;
+			} else {
+				fprintf(stderr, "unknown option: %s\n", arg);
+			}
 		} else {
 			if (!rule) {
 				rule = arg;
@@ -55,50 +61,65 @@ int main(int argc, char **argv)
 	}
 	std::string_view srcsym;
 	std::string_view dstsym;
-	{
-		char const *p1 = strchr(rule, ':');
-		if (p1) {
-			srcsym = {rule, size_t(p1 - rule)};
-			p1++;
-			char const *p2 = strchr(p1, ':');
-			if (!p2) {
-				dstsym = p1;
-			}
-		}
-		auto issymbol = [](std::string_view const &s){
-			int n = s.size();
-			if (n > 0) {
-				if (isalnum((unsigned char)s[0])) {
-					for (int i = 1; i < n; i++) {
-						if (!isalnum((unsigned char)s[i]) && s[i] != '_') {
-							return false;
-						}
-					}
-					return true;
+	if (!usage) {
+		if (rule) {
+			char const *p1 = strchr(rule, ':');
+			if (p1) {
+				srcsym = {rule, size_t(p1 - rule)};
+				p1++;
+				char const *p2 = strchr(p1, ':');
+				if (!p2) {
+					dstsym = p1;
 				}
 			}
-			return false;
-		};
-		if (!issymbol(srcsym)) {
-			fprintf(stderr, "source symbol is not specified\n");
+			auto issymbol = [](std::string_view const &s){
+				int n = s.size();
+				if (n > 0) {
+					if (isalnum((unsigned char)s[0])) {
+						for (int i = 1; i < n; i++) {
+							if (!isalnum((unsigned char)s[i]) && s[i] != '_') {
+								return false;
+							}
+						}
+						return true;
+					}
+				}
+				return false;
+			};
+			if (!issymbol(srcsym)) {
+				fprintf(stderr, "source symbol is not specified\n");
+				exit(1);
+			}
+			if (!issymbol(dstsym)) {
+				fprintf(stderr, "destination symbol is not specified\n");
+				exit(1);
+			}
+		} else {
+			fprintf(stderr, "rule is not specified\n");
 			exit(1);
 		}
-		if (!issymbol(dstsym)) {
-			fprintf(stderr, "destination symbol is not specified\n");
+		
+		if (!srcpath) {
+			fprintf(stderr, "source path is not specified\n");
+			exit(1);
+		}
+		
+		if (!dstpath) {
+			fprintf(stderr, "destination path is not specified\n");
 			exit(1);
 		}
 	}
-
-	if (!srcpath) {
-		fprintf(stderr, "source path is not specified\n");
+	
+	if (usage) {
+		fprintf(stderr, "usage: projector <rule> <srcpath> <dstpath>\n");
+		fprintf(stderr, "  rule: <srcsym>:<dstsym>\n");
+		fprintf(stderr, "   - srcsym: source symbol\n");
+		fprintf(stderr, "   - dstsym: destination symbol\n");
+		fprintf(stderr, "  srcpath: source path\n");
+		fprintf(stderr, "  dstpath: destination path\n");
 		exit(1);
 	}
-
-	if (!dstpath) {
-		fprintf(stderr, "destination path is not specified\n");
-		exit(1);
-	}
-
+	
 	std::string dstpath2;
 	std::string s = to_string(srcsym);
 	std::string d = to_string(dstsym);
@@ -127,7 +148,6 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
-
 
 	gen.perform(srcpath, dstpath2);
 
