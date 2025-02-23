@@ -1,7 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "Global.h"
-#include "ProjectGenerator.h"
+#include "Projector.h"
 #include "joinpath.h"
 #include "CustomGeneratorDialog.h"
 #include <QDebug>
@@ -51,7 +51,7 @@ void MainWindow::generate2()
 	if (project_name.isEmpty()) return;
 	dstdir = dstdir / project_name + "Plugin";
 
-	bool ok = ProjectGenerator("HelloWorld", project_name.toStdString()).perform(template_dir, dstdir);
+	bool ok = Projector("HelloWorld", project_name.toStdString()).perform(template_dir, dstdir);
 
 	if (ok) {
 		QMessageBox::information(this, "", tr("Generated Successfully"));

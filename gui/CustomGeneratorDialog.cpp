@@ -1,6 +1,6 @@
 #include "CustomGeneratorDialog.h"
 #include "ui_CustomGeneratorDialog.h"
-#include "ProjectGenerator.h"
+#include "Projector.h"
 #include "joinpath.h"
 #include <QFileDialog>
 #include <QMessageBox>
@@ -49,7 +49,7 @@ void CustomGeneratorDialog::on_pushButton_clicked()
 	if (!QFileInfo(dstdir).isDir()) return;
 	if (project_name.isEmpty()) return;
 
-	ProjectGenerator gen(keyword.toStdString(), project_name.toStdString());
+	Projector gen(keyword.toStdString(), project_name.toStdString());
 	dstdir = dstdir / gen.replaceWords(info.fileName());
 	if (QFileInfo(dstdir).exists()) return;
 

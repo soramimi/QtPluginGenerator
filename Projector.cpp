@@ -1,4 +1,4 @@
-#include "ProjectGenerator.h"
+#include "Projector.h"
 #include "joinpath.h"
 #include <algorithm>
 #include <cstring>
@@ -102,7 +102,7 @@ int strncasecmp(char const *l, const char *r, int n)
 }
 #endif
 
-ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_view const &dstname)
+Projector::Projector(std::string_view const &srcname, std::string_view const &dstname)
 {
 	srcwords_ = split(srcname);
 	dstwords_ = split(dstname);
@@ -117,7 +117,7 @@ ProjectGenerator::ProjectGenerator(std::string_view const &srcname, std::string_
  * 
  * 例: srctext = "HelloWorld", srcwords = ["Hello", "World"], dstwords = ["Good", "Bye"]
  */
-std::vector<char> ProjectGenerator::internalReplaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+std::vector<char> Projector::internalReplaceWords(std::string_view const &srctext, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	std::vector<char> newtext;
 
@@ -257,7 +257,7 @@ bool mkpath(std::string const &path, std::string const &dir, int mode)
  * @param srcwords
  * @param dstwords
  */
-void ProjectGenerator::convertFile(std::string const &srcpath, std::string const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+void Projector::convertFile(std::string const &srcpath, std::string const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	int fd = open(srcpath.c_str(), O_RDONLY);
 	if (fd != -1) {
@@ -325,7 +325,7 @@ void scandir(std::string const &basedir, std::string const &absdir, std::vector<
  * @param s
  * @return 
  */
-std::string ProjectGenerator::replaceWords(std::string const &t)
+std::string Projector::replaceWords(std::string const &t)
 {
 	auto vec = internalReplaceWords(t, srcwords_, dstwords_);
 	return std::string(vec.data(), vec.size());
@@ -337,7 +337,7 @@ std::string ProjectGenerator::replaceWords(std::string const &t)
  * @param dstpath
  * @return 
  */
-bool ProjectGenerator::perform(std::string const &srcpath, std::string const &dstpath)
+bool Projector::perform(std::string const &srcpath, std::string const &dstpath)
 {
 	std::vector<FileItem> files;
 	scandir(srcpath, {}, &files);
@@ -380,7 +380,7 @@ bool ProjectGenerator::perform(std::string const &srcpath, std::string const &ds
  * @param srcwords
  * @param dstwords
  */
-void ProjectGenerator::convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
+void Projector::convertFile(QString const &srcpath, QString const &dstpath, std::vector<std::string> const &srcwords, std::vector<std::string> const &dstwords)
 {
 	QFile infile(srcpath);
 	if (infile.open(QFile::ReadOnly)) {
@@ -441,7 +441,7 @@ void scandir(QString const &basedir, QString const &absdir, std::vector<qFileIte
  * @param s
  * @return 
  */
-QString ProjectGenerator::replaceWords(QString const &s)
+QString Projector::replaceWords(QString const &s)
 {
 	std::string t = s.toStdString();
 	auto vec = internalReplaceWords(t, srcwords_, dstwords_);
@@ -454,7 +454,7 @@ QString ProjectGenerator::replaceWords(QString const &s)
  * @param dstpath
  * @return 
  */
-bool ProjectGenerator::perform(QString const &srcpath, QString const &dstpath)
+bool Projector::perform(QString const &srcpath, QString const &dstpath)
 {
 	std::vector<qFileItem> files;
 	scandir(srcpath, {}, &files);

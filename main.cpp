@@ -1,5 +1,6 @@
 
-#include "ProjectGenerator.h"
+#include "Projector.h"
+#include "joinpath.h"
 #include <cctype>
 #include <cstring>
 #include <sys/stat.h>
@@ -11,7 +12,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
-#include "joinpath.h"
 #endif
 
 std::string to_string(std::string_view const &v)
@@ -120,36 +120,42 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 	
-	std::string dstpath2;
 	std::string s = to_string(srcsym);
 	std::string d = to_string(dstsym);
 	ProjectGenerator gen(s, d);
-
+	
 	struct stat srcst;
 	if (stat(srcpath, &srcst) != 0) {
 		fprintf(stderr, "no such file or directory: %s\n", srcpath);
 		exit(1);
 	}
-
-	dstpath2 = dstpath;
+	
+	std::string srcpath2;
+	{
+		std::string_view v = srcpath;
+		while (v.size() > 0 && v.back() == '/') {
+			v = v.substr(0, v.size() - 1);
+		}
+		srcpath2 = v;
+	}
+	std::string dstpath2 = dstpath;
 	struct stat dstst;
 	if (stat(dstpath, &dstst) == 0) {
 		if (S_ISDIR(dstst.st_mode)) {
-			char const *p = strrchr(srcpath, '/');
+			char const *p = strrchr(srcpath2.c_str(), '/');
 			if (p) {
 				p++;
 			} else {
-				p = srcpath;
+				p = srcpath2.c_str();
 			}
-			dstpath2 += '/';
-			dstpath2 += gen.replaceWords(p);
+			dstpath2 = dstpath2 / gen.replaceWords(p);
 		} else {
 			fprintf(stderr, "already existing: %s\n", dstpath);
 			exit(1);
 		}
 	}
 
-	gen.perform(srcpath, dstpath2);
+	gen.perform(srcpath2, dstpath2);
 
 	return 0;
 #endif
